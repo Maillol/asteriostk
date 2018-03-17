@@ -9,7 +9,7 @@ from queue import Empty
 import re
 import sys
 import tempfile
-from textwrap import dedent
+import textwrap
 from tkinter import Button as TKButton
 from tkinter import Frame as TKFrame
 from tkinter import Label as TKLabel
@@ -195,8 +195,6 @@ class Configurator(Toplevel):
         self.title('client configuration')
 
         VARIABLES.host.set('http://127.0.0.1:8000')
-        # VARIABLES.team.set('team-17')
-        # VARIABLES.member_id.set('9444')
 
         def _start_command():
             """
@@ -215,6 +213,52 @@ class Configurator(Toplevel):
             row=4, column=2, sticky='e')
 
 
+class PuzzleViewer(Frame):
+
+    @classmethod
+    def _format(cls, obj, indent=0):
+        prefix = '  ' * indent
+        if isinstance(obj, list):
+            return textwrap.indent(
+                '\n[' + ','.join(cls._format(e, indent + 1)
+                                 for e in obj) + '\n]',
+                prefix)
+        elif isinstance(obj, dict):
+            return textwrap.indent(
+                '\n{' + (','.join(
+                         '{}:{}'.format(cls._format(k, indent + 1),
+                                        cls._format(v, indent + 1))
+                         for k, v
+                         in obj.items())) + '\n}',
+                prefix)
+        return textwrap.indent('\n' + str(obj), prefix)
+
+    def __init__(self, master):
+        super().__init__(master)
+        self._text = Text(self, font=("Mono", 12))
+        self.button = Button(self, text='repr',
+                             command=self.toggle)
+        self._raw_text = ''
+        self._text.pack(fill='both', expand=1)
+        self.button.pack()
+
+    def update_text(self, obj):
+        self._raw_text = obj
+        self._text.delete('0.0', 'end')
+        if self.button.cget('text') == 'repr':
+            self._text.insert('end', pprint.pformat(obj))
+        else:
+            self._text.insert('end', self._format(obj))
+
+    def toggle(self):
+        if self.button.cget('text') == 'repr':
+            self.button.config(text='str')
+            self.update_text(self._raw_text)
+        else:
+            self.button.config(text='repr')
+            self.update_text(self._raw_text)
+
+
 class Application:
     def __init__(self):
         self.root = Tk()
@@ -227,14 +271,14 @@ class Application:
         self.tips_text = Text(nb)
         nb.add(self.tips_text, text='tips')
 
-        self.puzzle_text = Text(nb)
+        self.puzzle_text = PuzzleViewer(nb)
         nb.add(self.puzzle_text, text='puzzle')
 
         self.solver_text = CodeEditor(nb)
         nb.add(self.solver_text, text='solver')
         self.solver_text.insert(
             'end',
-            dedent('''\
+            textwrap.dedent('''\
                 def solve(puzzle):
                     """
                     Complete cette fonction
@@ -287,13 +331,21 @@ class Application:
         try:
             response = urlopen(request)  # timeout=120
         except HTTPError as error:
-            self.notify(error.read().decode('utf-8'))
+            msg = error.read().decode('utf-8')
+
+            try:
+                data = json.loads(msg)
+            except:
+                self.notify(msg)
+            else:
+                print(data['exception'])  # TODO DISPLAY VICTORY POPUP
+                self.notify(msg)
+
         else:
             data = json.loads(response.read().decode('utf-8'))
             self.tips_text.delete('0.0', 'end')
             self.tips_text.insert('end', data['tip'])
-            self.puzzle_text.delete('0.0', 'end')
-            self.puzzle_text.insert('end', pprint.pformat(data['puzzle']))
+            self.puzzle_text.update_text(data['puzzle'])
             VARIABLES.puzzle = data['puzzle']
 
     def solve(self):
