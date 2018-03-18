@@ -89,7 +89,8 @@ class CodeEditor(Frame):
             ('keyword', re.compile(re_kw))
         )
 
-        self.text.bind("<KeyRelease>", self.highlight)
+        self.text.bind('<KeyRelease>', self.highlight)
+        self.text.bind('<Tab>', self._spaces_on_tab)
 
     def highlight(self, event=None):
         text_widget = self.text
@@ -125,6 +126,10 @@ class CodeEditor(Frame):
 
     def get(self, *args, **kwargs):
         return self.text.get(*args, **kwargs)
+
+    def _spaces_on_tab(self, event=None):
+        self.text.insert('insert', '    ')
+        return 'break'
 
 
 class VariableSet:
