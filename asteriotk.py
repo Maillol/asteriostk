@@ -1,5 +1,6 @@
 from bisect import bisect
 import importlib
+import itertools
 import json
 import keyword
 import multiprocessing
@@ -259,6 +260,40 @@ class PuzzleViewer(Frame):
             self.update_text(self._raw_text)
 
 
+class GameOverToplevel(Toplevel):
+    def __init__(self, master, text_label):
+        super().__init__(master)
+        self.title('Asterios: Game Over')
+        label = TKLabel(self, text=text_label,
+                        font=("Mono", 40, 'bold'))
+        label.pack(fill='both', expand=1)
+
+        for toplevel in master.children.values():
+            if toplevel != self:
+                self.wm_transient(toplevel)
+        self.wm_transient(master)
+
+        sprites = self._sprites(text_label)
+
+        def animate():
+            time, text = next(sprites)
+            label.config(text=text)
+            self.after(time, animate)
+
+        animate()
+
+    @staticmethod
+    def _sprites(text):
+        nb_spaces = len(text) - 3
+        return itertools.cycle(
+            [(125, ' ' * i + char + ' ' * (nb_spaces - i))
+             for i, char
+             in enumerate(
+                [''.join(e) for e in zip(text, text[1:], text[2:])]
+            )] + [(250, ' ' * len(text)), (3000, text)]
+        )
+
+
 class Application:
     def __init__(self):
         self.root = Tk()
@@ -338,8 +373,10 @@ class Application:
             except:
                 self.notify(msg)
             else:
-                print(data['exception'])  # TODO DISPLAY VICTORY POPUP
-                self.notify(msg)
+                if data['exception'] == 'LevelSet.DoneException':
+                    GameOverToplevel(self.root, 'Victory')
+                else:
+                    self.notify(msg)
 
         else:
             data = json.loads(response.read().decode('utf-8'))
@@ -347,6 +384,16 @@ class Application:
             self.tips_text.insert('end', data['tip'])
             self.puzzle_text.update_text(data['puzzle'])
             VARIABLES.puzzle = data['puzzle']
+
+    def _display_solved_puzzle(self, solved_puzzle):
+        """
+        Shows a Toplevel containing the `solved_puzzle`.
+        """
+        top_level = Toplevel(self.root)
+        viewer = PuzzleViewer(top_level)
+        viewer.pack()
+        viewer.update_text(solved_puzzle)
+        top_level.wm_transient(self.root)
 
     def solve(self):
 
@@ -417,18 +464,15 @@ class Application:
             #
 
             if not success:
-                if solution_or_error != 'killed':
-                    self.notify(''.join(solution_or_error), 'error')
-
-                else:
-                    self.notify('Killed !')
-
+                self.notify(''.join(solution_or_error), 'error')
             else:
+                self._display_solved_puzzle(solution_or_error)
                 try:
                     solution = json.dumps(solution_or_error)
                 except (ValueError, TypeError) as error:
                     self.notify('The solve function should return a'
                                 ' JSON serializable object ({})'.format(error), 'error')
+                    return
 
                 url = '{host}/asterios/{team}/member/{member_id}'.format(
                     host=VARIABLES.host.get(),
