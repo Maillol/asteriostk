@@ -14,7 +14,7 @@ import textwrap
 from tkinter import Button as TKButton
 from tkinter import Frame as TKFrame
 from tkinter import Label as TKLabel
-from tkinter import Menu, StringVar, Text, Tk, Toplevel
+from tkinter import Menu, StringVar, PanedWindow, Text, Tk, Toplevel
 from tkinter.ttk import Button, Entry, Frame, Label, Notebook, Scrollbar
 import traceback
 from urllib.parse import parse_qsl, urlencode
@@ -174,8 +174,8 @@ class NotificationViewer(TKFrame):
                                                 expand=1,
                                                 anchor='ne')
 
-    def __init__(self, master):
-        super().__init__(master)
+    def __init__(self, master, **kwarg):
+        super().__init__(master, **kwarg)
 
     def notify(self, message, severity=None):
         if severity == 'error':
@@ -306,7 +306,9 @@ class Application:
         self.root.wm_title('asterios')
         self._init_menu()
 
-        nb = Notebook(self.root)
+        paned_window = PanedWindow(self.root, orient='vertical')
+
+        nb = Notebook(paned_window)
 
         self.tips_text = Text(nb)
         nb.add(self.tips_text, text='tips')
@@ -329,10 +331,11 @@ class Application:
             ''')
         )
 
-        self.notif_text = NotificationViewer(self.root)
+        self.notif_text = NotificationViewer(paned_window, relief='ridge', border=3)
 
-        nb.pack(fill='both', expand=1)
-        self.notif_text.pack(fill='both', expand=1)
+        paned_window.add(nb, sticky='nsew')
+        paned_window.add(self.notif_text, sticky='nsew', minsize=80)
+        paned_window.pack(fill='both', expand=1)
         self.show_configuration_window()
 
     def _init_menu(self):
