@@ -91,6 +91,7 @@ class CodeEditor(Frame):
 
         self.text.bind('<KeyRelease>', self.highlight)
         self.text.bind('<Tab>', self._spaces_on_tab)
+        self.text.bind('<Control-a>', self._select_all)
 
     def highlight(self, event=None):
         text_widget = self.text
@@ -129,6 +130,12 @@ class CodeEditor(Frame):
 
     def _spaces_on_tab(self, event=None):
         self.text.insert('insert', '    ')
+        return 'break'
+
+    def _select_all(self, event=None):
+        self.text.tag_add('sel', "1.0", 'end')
+        self.text.mark_set('insert', "1.0")
+        self.text.see('insert')
         return 'break'
 
 
